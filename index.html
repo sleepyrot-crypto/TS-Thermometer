@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reddit Trend Sentiment Thermometer | Compare Public Opinion</title>
+    <meta name="description" content="Compare public sentiment between two trending topics using Reddit API data visualized with interactive thermometers">
+    <style>
+        :root {
+            --primary-color: #ff4500;
+            --primary-dark: #cc3700;
+            --secondary-color: #1c1c1c;
+            --light-bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --text-light: #6c757d;
+            --border-radius: 12px;
+            --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--light-bg);
+            color: var(--text-color);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: var(--card-bg);
+            padding: 2rem 1rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+
+        .logo {
+            width: 70px;
+            height: 70px;
+            margin-right: 1rem;
+            border-radius: 50%;
+            object-fit: cover;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: var(--secondary-color);
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .tagline {
+            color: var(--text-light);
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        main {
+            flex: 1;
+            padding: 1.5rem 1rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .form-container {
+            background-color: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            box-shadow: var(--box-shadow);
+            margin-bottom: 1.5rem;
+        }
+
+        #trend-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        @media (min-width: 768px) {
+            .input-group {
+                flex-direction: row;
+                justify-content: space-between;
+            }
+        }
+
+        .input-container {
+            flex: 1;
+            position: relative;
+        }
+
+        .input-container label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--secondary-color);
+        }
+
+        #trend-form input {
+            width: 100%;
+            padding: 1rem 1.2rem;
+            border: 2px solid #e9ecef;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        #trend-form input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(255, 69, 0, 0.1);
+        }
+
+        #trend-form button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            align-self: center;
+            min-width: 200px;
+        }
+
+        #trend-form button:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(255, 69, 0, 0.2);
+        }
+
+        #trend-form button:active {
+            transform: translateY(0);
+        }
+
+        #trend-form button:disabled {
+            background-color: #adb5bd;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        #message {
+            text-align: center;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            background-color: #e7f5ff;
+            color: #0c4a6e;
+            transition: var(--transition);
+        }
+
+        #message.error {
+            background-color: #ffe3e3;
+            color: #c92a2a;
+        }
+
+        #message.success {
+            background-color: #d3f9d8;
+            color: #2b8a3e;
+        }
+
+        #message.info {
+            background-color: #e7f5ff;
+            color: #0c4a6e;
+        }
+
+        .cache-indicator {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            background-color: #fff3cd;
+            color: #856404;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-left: 0.5rem;
+            font-weight: 600;
+        }
+
+        .refresh-info {
+            text-align: center;
+            margin: 0.5rem 0;
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        .refresh-button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+            margin-left: 1rem;
+            transition: var(--transition);
+        }
+
+        .refresh-button:hover {
+            background-color: #218838;
+        }
+
+        .small-ad {
+            margin: 1rem auto;
+            padding: 0.8rem;
+            background-color: var(--card-bg);
+            border: 1px dashed #dee2e6;
+            border-radius: var(--border-radius);
+            text-align: center;
+            color: var(--text-light);
+            font-size: 0.9rem;
+            max-width: 300px;
+        }
+
+        #results-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            margin-top: 1rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        #results-container.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        @media (min-width: 768px) {
+            #results-container {
+                flex-direction: row;
+                justify-content: center;
+                align-items: flex-end;
+            }
+        }
+
+        .thermometer-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+
+        .thermometer-container {
+            position: relative;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+
+        .thermometer {
+            width: 50px;
+            height: 220px;
+            background-color: #f1f3f5;
+            border: 3px solid #495057;
+            border-radius: 25px 25px 5px 5px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--box-shadow);
+        }
+
+        .mercury {
+            width: 100%;
+            position: absolute;
+            bottom: 0;
+            background: linear-gradient(to top, #3498db, #e74c3c);
+            transition: height 1.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 1.2s ease;
+            border-radius: 0 0 5px 5px;
+            will-change: height;
+        }
+
+        .mercury.hot { background: linear-gradient(to top, #ff6b6b, #e74c3c); }
+        .mercury.cold { background: linear-gradient(to top, #3498db, #2980b9); }
+        .mercury.neutral { background: linear-gradient(to top, #95a5a6, #7f8c8d); }
+
+        .temperature-labels {
+            position: absolute;
+            left: -40px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
+        .temperature-value {
+            position: absolute;
+            top: -35px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--secondary-color);
+            background: var(--card-bg);
+            padding: 0.4rem 0.8rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            min-width: 70px;
+            text-align: center;
+        }
+
+        .trend-label {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--secondary-color);
+            text-align: center;
+            margin-bottom: 0.5rem;
+            word-break: break-word;
+        }
+
+        .sentiment-label {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            text-align: center;
+        }
+
+        .comparison-result {
+            text-align: center;
+            margin-top: 1.5rem;
+            padding: 1.2rem;
+            background-color: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+
+        .winner {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .difference {
+            font-size: 1rem;
+            color: var(--text-light);
+        }
+
+        .features-section {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            background-color: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        @media (min-width: 768px) {
+            .features-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .features-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        .feature-card {
+            padding: 1.2rem;
+            background-color: var(--light-bg);
+            border-radius: var(--border-radius);
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--box-shadow);
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 0.8rem;
+            color: var(--primary-color);
+        }
+
+        .feature-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 0.8rem;
+            color: var(--secondary-color);
+        }
+
+        .feature-description {
+            color: var(--text-light);
+            line-height: 1.5;
+            font-size: 0.9rem;
+        }
+
+        footer {
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 1.5rem 1rem;
+            text-align: center;
+            margin-top: 2rem;
+        }
+
+        .footer-content {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .api-info {
+            font-size: 0.8rem;
+            color: #adb5bd;
+            margin-top: 0.8rem;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .ad-slot {
+            margin: 1.5rem auto;
+            padding: 0.8rem;
+            background-color: var(--card-bg);
+            border: 1px dashed #dee2e6;
+            border-radius: var(--border-radius);
+            text-align: center;
+            color: var(--text-light);
+            font-size: 0.9rem;
+            max-width: 300px;
+        }
+
+        .ad-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .auto-refresh-info {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: var(--border-radius);
+            padding: 0.8rem;
+            margin: 1rem 0;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://i.ibb.co/93HTpyqT/Picsart-25-11-11-19-40-31-771.png" alt="Trend Thermometer Logo" class="logo">
+            <div>
+                <h1>Trend Sentiment Thermometer</h1>
+                <p class="tagline">Compare public sentiment between two trending topics using real-time data</p>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="form-container">
+            <form id="trend-form">
+                <div class="input-group">
+                    <div class="input-container">
+                        <label for="trend1">First Trend</label>
+                        <input type="text" id="trend1" placeholder="e.g., Bitcoin" required>
+                    </div>
+                    <div class="input-container">
+                        <label for="trend2">Second Trend</label>
+                        <input type="text" id="trend2" placeholder="e.g., Gold" required>
+                    </div>
+                </div>
+                <button type="submit" id="submit-btn">
+                    <span class="btn-text">Compare Trends</span>
+                </button>
+            </form>
+        </div>
+
+        <div class="small-ad">
+            <p>Advertisement Space</p>
+        </div>
+
+        <div id="message">Enter two trends to compare their sentiment heat.</div>
+        
+        <div id="refresh-info" class="refresh-info" style="display: none;"></div>
+        
+        <div id="results-container">
+            <div class="thermometer-group">
+                <div class="trend-label" id="label-1">Trend 1</div>
+                <div class="thermometer-container">
+                    <div class="temperature-value" id="value-1">0%</div>
+                    <div class="temperature-labels">
+                        <span>Hot</span>
+                        <span>Neutral</span>
+                        <span>Cold</span>
+                    </div>
+                    <div class="thermometer">
+                        <div class="mercury" id="mercury-1"></div>
+                    </div>
+                </div>
+                <div class="sentiment-label" id="sentiment-1">Neutral</div>
+            </div>
+
+            <div class="thermometer-group">
+                <div class="trend-label" id="label-2">Trend 2</div>
+                <div class="thermometer-container">
+                    <div class="temperature-value" id="value-2">0%</div>
+                    <div class="temperature-labels">
+                        <span>Hot</span>
+                        <span>Neutral</span>
+                        <span>Cold</span>
+                    </div>
+                    <div class="thermometer">
+                        <div class="mercury" id="mercury-2"></div>
+                    </div>
+                </div>
+                <div class="sentiment-label" id="sentiment-2">Neutral</div>
+            </div>
+        </div>
+
+        <div class="comparison-result" id="comparison-result" style="display: none;">
+            <div class="winner" id="winner-text"></div>
+            <div class="difference" id="difference-text"></div>
+        </div>
+
+        <div class="features-section">
+            <h2 style="text-align: center; margin-bottom: 1rem; color: var(--secondary-color);">Why Use TS Thermometer?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <h3 class="feature-title">Search Real Data</h3>
+                    <p class="feature-description">Search real data and compare between two different items. You can use it for your daily purposes.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📈</div>
+                    <h3 class="feature-title">Trade Smart</h3>
+                    <p class="feature-description">Trade and choose the best for yourself! Stay informed about the latest trends between Bitcoin, Gold, and more for your continued transactions!</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🚗</div>
+                    <h3 class="feature-title">Compare Products</h3>
+                    <p class="feature-description">Compare cars with each other! Stay informed about the latest technologies! With TS Thermometer, easily ensure your desired choice is trendier.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3 class="feature-title">Instant Comparison</h3>
+                    <p class="feature-description">TS Thermometer is a tool for comparing the trendiness of anything you want at any moment! Just enter your desired items and see the result as a thermometer!</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🌐</div>
+                    <h3 class="feature-title">Real-time Data</h3>
+                    <p class="feature-description">Get real-time sentiment analysis from Reddit's vast community to make informed decisions.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3 class="feature-title">Visual Analytics</h3>
+                    <p class="feature-description">Clear visual representation of sentiment data through intuitive thermometer displays.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="ad-container">
+            <div class="ad-slot">
+                <p>Advertisement Space</p>
+            </div>
+            <div class="ad-slot">
+                <p>Advertisement Space</p>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <p>Data-Driven Insights Platform | All sentiment calculations are derived from public social media data.</p>
+            <p class="api-info">Powered by TS Thermometer</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('trend-form');
+            const submitBtn = document.getElementById('submit-btn');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const messageElement = document.getElementById('message');
+            const refreshInfoElement = document.getElementById('refresh-info');
+            const resultsContainer = document.getElementById('results-container');
+            const comparisonResult = document.getElementById('comparison-result');
+            const winnerText = document.getElementById('winner-text');
+            const differenceText = document.getElementById('difference-text');
+
+            let currentAnalysis = null;
+            let refreshTimer = null;
+            let autoRefreshInterval = null;
+
+            // Initialize thermometers
+            updateThermometer(1, 'Trend 1', 0, true);
+            updateThermometer(2, 'Trend 2', 0, true);
+
+            form.addEventListener('submit', async function(event) {
+                event.preventDefault();
+                const trend1 = document.getElementById('trend1').value.trim();
+                const trend2 = document.getElementById('trend2').value.trim();
+
+                if (!trend1 || !trend2) {
+                    showMessage('Please enter both trends to compare.', 'error');
+                    return;
+                }
+
+                await analyzeTrends(trend1, trend2);
+            });
+
+            async function analyzeTrends(trend1, trend2, forceRefresh = false) {
+                submitBtn.disabled = true;
+                btnText.innerHTML = '<span class="loading"></span> Analyzing...';
+                
+                if (forceRefresh) {
+                    showMessage('Refreshing sentiment data...', 'info');
+                } else {
+                    showMessage('Analyzing sentiment trends... Please wait.', 'info');
+                }
+
+                try {
+                    const response = await fetch('/.netlify/functions/sentiment-analyzer', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ trend1, trend2, forceRefresh })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Server connection error.');
+                    }
+
+                    const data = await response.json();
+
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+
+                    // ذخیره تحلیل جاری
+                    currentAnalysis = { trend1, trend2, data };
+
+                    // نمایش نتایج
+                    if (data.cached) {
+                        showMessage('Showing cached results (data is 10 minutes old)', 'info');
+                        showCacheIndicator();
+                    } else {
+                        showMessage('Fresh sentiment analysis completed!', 'success');
+                        hideCacheIndicator();
+                    }
+
+                    // آپدیت دماسنج‌ها
+                    updateThermometer(1, trend1, data.sentiment1);
+                    updateThermometer(2, trend2, data.sentiment2);
+                    
+                    // نمایش مقایسه
+                    showComparisonResult(trend1, trend2, data.sentiment1, data.sentiment2);
+                    
+                    // نمایش کانتダون بروزرسانی
+                    if (data.nextRefresh) {
+                        startRefreshCountdown(data.nextRefresh);
+                    }
+
+                    // نمایش نتایج
+                    resultsContainer.classList.add('visible');
+
+                    // شروع بروزرسانی خودکار
+                    startAutoRefresh(trend1, trend2);
+
+                } catch (error) {
+                    console.error('Fetch Error:', error);
+                    showMessage(`Error: ${error.message}. Please try again.`, 'error');
+                    updateThermometer(1, trend1, 0, true);
+                    updateThermometer(2, trend2, 0, true);
+                } finally {
+                    submitBtn.disabled = false;
+                    btnText.textContent = 'Compare Trends';
+                }
+            }
+
+            function startAutoRefresh(trend1, trend2) {
+                // پاک کردن interval قبلی
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                }
+
+                // بروزرسانی خودکار هر 10 دقیقه
+                autoRefreshInterval = setInterval(async () => {
+                    if (currentAnalysis) {
+                        showMessage('Auto-refreshing sentiment data...', 'info');
+                        await analyzeTrends(trend1, trend2, true);
+                    }
+                }, 10 * 60 * 1000); // 10 دقیقه
+            }
+
+            function startRefreshCountdown(nextRefreshTime) {
+                const now = Date.now();
+                const timeUntilRefresh = nextRefreshTime - now;
+
+                if (timeUntilRefresh > 0) {
+                    // پاک کردن تایمر قبلی
+                    if (refreshTimer) {
+                        clearInterval(refreshTimer);
+                    }
+
+                    refreshTimer = setInterval(() => {
+                        const timeLeft = nextRefreshTime - Date.now();
+                        
+                        if (timeLeft <= 0) {
+                            clearInterval(refreshTimer);
+                            refreshInfoElement.innerHTML = `
+                                <div class="auto-refresh-info">
+                                    Data is ready for refresh! 
+                                    <button class="refresh-button" onclick="refreshCurrentAnalysis()">Refresh Now</button>
+                                </div>
+                            `;
+                        } else {
+                            const minutes = Math.floor(timeLeft / 60000);
+                            const seconds = Math.floor((timeLeft % 60000) / 1000);
+                            refreshInfoElement.innerHTML = `
+                                <div class="auto-refresh-info">
+                                    Next auto-refresh in: ${minutes}m ${seconds}s 
+                                    <button class="refresh-button" onclick="refreshCurrentAnalysis()">Refresh Now</button>
+                                </div>
+                            `;
+                        }
+                    }, 1000);
+
+                    refreshInfoElement.style.display = 'block';
+                }
+            }
+
+            function refreshCurrentAnalysis() {
+                if (currentAnalysis) {
+                    analyzeTrends(currentAnalysis.trend1, currentAnalysis.trend2, true);
+                }
+            }
+
+            function showCacheIndicator() {
+                const cacheSpan = document.createElement('span');
+                cacheSpan.className = 'cache-indicator';
+                cacheSpan.textContent = 'CACHED';
+                cacheSpan.title = 'This data is from cache (10 minutes old)';
+                
+                const existingIndicator = messageElement.querySelector('.cache-indicator');
+                if (!existingIndicator) {
+                    messageElement.appendChild(cacheSpan);
+                }
+            }
+
+            function hideCacheIndicator() {
+                const existingIndicator = messageElement.querySelector('.cache-indicator');
+                if (existingIndicator) {
+                    existingIndicator.remove();
+                }
+            }
+
+            function updateThermometer(id, label, score, reset = false) {
+                const mercury = document.getElementById(`mercury-${id}`);
+                const labelElement = document.getElementById(`label-${id}`);
+                const valueElement = document.getElementById(`value-${id}`);
+                const sentimentElement = document.getElementById(`sentiment-${id}`);
+                
+                const heightPercent = reset ? 0 : Math.max(0, Math.min(100, score * 100));
+                
+                mercury.style.height = `${heightPercent}%`;
+                labelElement.textContent = label;
+                valueElement.textContent = `${Math.round(heightPercent)}%`;
+                
+                let sentiment = 'Neutral';
+                let colorClass = 'neutral';
+                
+                if (score >= 0.7) {
+                    sentiment = 'Hot';
+                    colorClass = 'hot';
+                } else if (score <= 0.3 && score > 0) {
+                    sentiment = 'Cold';
+                    colorClass = 'cold';
+                }
+                
+                sentimentElement.textContent = sentiment;
+                mercury.className = 'mercury';
+                mercury.classList.add(colorClass);
+            }
+
+            function showComparisonResult(trend1, trend2, score1, score2) {
+                const percent1 = Math.round(score1 * 100);
+                const percent2 = Math.round(score2 * 100);
+                const difference = Math.abs(percent1 - percent2);
+                
+                if (percent1 > percent2) {
+                    winnerText.textContent = `${trend1} is hotter by ${difference}%`;
+                } else if (percent2 > percent1) {
+                    winnerText.textContent = `${trend2} is hotter by ${difference}%`;
+                } else {
+                    winnerText.textContent = "It's a tie! Both trends have equal sentiment.";
+                }
+                
+                differenceText.textContent = `Sentiment: ${trend1} ${percent1}% | ${trend2} ${percent2}%`;
+                comparisonResult.style.display = 'block';
+            }
+
+            function showMessage(text, type) {
+                messageElement.textContent = text;
+                messageElement.className = '';
+                
+                if (type === 'error') {
+                    messageElement.classList.add('error');
+                } else if (type === 'success') {
+                    messageElement.classList.add('success');
+                } else if (type === 'info') {
+                    messageElement.classList.add('info');
+                }
+            }
+
+            // در دسترس قرار دادن تابع برای دکمه
+            window.refreshCurrentAnalysis = refreshCurrentAnalysis;
+        });
+    </script>
+</body>
+</html>
